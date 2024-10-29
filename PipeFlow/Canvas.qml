@@ -24,7 +24,9 @@ Item {
 				nodeState: node_state
 				nodeType: node_type
 				nodeApi: node_api
+				muteVolume: mute
 				chnVols: chnvols
+				chnMap: chnmap.split(",")
 				inPorts: inports
 				outPorts: outports
 			}
@@ -43,6 +45,7 @@ Item {
 				linkId: link_id
 				inPort: findNodePortById(input_node_id, input_port_id)
 				outPort: findNodePortById(output_node_id, output_port_id)
+				visible: outPort && outPort.visible && inPort && inPort.visible
 			}
 		}
 	}

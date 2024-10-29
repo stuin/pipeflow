@@ -1,5 +1,5 @@
 pkgname=pipeflow
-pkgver=0.2
+pkgver=0.3
 pkgrel=1
 pkgdesc="Fun-In-Progress GUI for PipeWire"
 arch=('any')
@@ -9,9 +9,9 @@ depends=('pyside6' 'python3')
 
 package() {
 	cd ../../..
-	install -dm755 "$pkgdir/usr/lib/python3.11/site-packages/libpipeflow"
+	install -dm755 "$pkgdir/usr/lib/python3.12/site-packages/libpipeflow"
 	for file in libpipeflow/*.py; do
-		install -m644 "$file" "$pkgdir/usr/lib/python3.11/site-packages/libpipeflow/"
+		install -m644 "$file" "$pkgdir/usr/lib/python3.12/site-packages/libpipeflow/"
 	done
 	install -dm755 "$pkgdir/usr/lib/qt6/qml/PipeFlow"
 	for file in PipeFlow/*; do

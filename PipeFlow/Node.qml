@@ -9,7 +9,10 @@ Rectangle {
 	property string nodeState
 	property string nodeType
 	property string nodeApi
+	property bool muteVolume
+	property bool lockVolume: false
 	property var chnVols: []
+	property list<string> chnMap
 	property var inPorts
 	property var outPorts
 	color: Theme.colorLayer1
@@ -45,19 +48,38 @@ Rectangle {
 				onPressed: hideToolTip()
 			}
 		}
+		ColumnLayout {
+			id: channelVolumes
+		}
 		Repeater {
 			model: root.chnVols
 			My.Slider {
 				Layout.fillWidth: true
 				Layout.leftMargin: Theme.margin
-				Layout.rightMargin: Theme.margin
+				Layout.rightMargin: Theme.margin + 10
+				parent: channelVolumes
+				index: -1
+				nodeId: root.nodeId
 				value: val
+				muteVolume: root.muteVolume
+				lockVolume: root.lockVolume
 				infoText: [
-					"("+root.nodeId+") Node channelVolumes " + index + " : " + modelData,
+					"("+root.nodeId+") Channel " + chnMap[index] + " Volume : " + modelData + " " + root.groupRoot,
 					"- Left click to set volume at cursor"
 				].join("\n")
 				onRequestValueChanged: {
-					PwCli.set_channel_volumes(root.nodeId, [requestValue, requestValue])
+					var volumes = channelVolumes.children.map(slider => slider.requestValue)
+					if(lockVolume)
+						volumes = channelVolumes.children.map(slider => requestValue)
+					PwCli.set_channel_volumes(root.nodeId, volumes)
+				}
+				onRequestMuteChanged: {
+					PwCli.set_mute(root.nodeId, requestMute)
+				}
+				onRequestLockChanged: {
+					root.lockVolume = requestLock
+					for(let slider of channelVolumes.children)
+						slider.requestValue = channelVolumes.children[0].value
 				}
 			}
 		}
@@ -108,5 +130,24 @@ Rectangle {
 			height: root.radius
 			width: 1
 		}
+	}
+	Component.onCompleted: {
+		var lock = true
+		var volume = -1
+		for(var i = 0; i < channelVolumes.children.length; i++) {
+			if(volume == -1)
+				volume = channelVolumes.children[i].value
+			if(volume != channelVolumes.children[i].value)
+				lock = false
+			channelVolumes.children[i].index = i
+		}
+		root.lockVolume = lock
+	}
+	component TheText: My.Text {
+		topPadding: Theme.padding
+		bottomPadding: Theme.padding
+		leftPadding: Theme.padding * 2
+		rightPadding: Theme.padding * 2
+		defaultColor: Theme.colorLayer2
 	}
 }

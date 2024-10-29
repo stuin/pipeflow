@@ -18,3 +18,9 @@ class PWCli(QObject):
 			"channelVolumes": vols
 		})
 		self.set_param([str(object_id), "Props", data])
+	@Slot(int, float)
+	def set_mute(self, object_id, mute):
+		data = json.dumps({
+			"mute": mute
+		})
+		self.set_param([str(object_id), "Props", data])

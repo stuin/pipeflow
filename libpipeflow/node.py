@@ -13,7 +13,9 @@ class Node:
 	node_api: str
 	node_type: str
 	node_state: str
+	mute: bool
 	chnvols: RealModel
+	chnmap: str
 	inports: PortModel
 	outports: PortModel
 

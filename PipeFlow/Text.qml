@@ -5,6 +5,7 @@ Text {
 	id: root
 	property color defaultColor: Theme.colorLayer3
 	property string toolTip
+	property color setColor
 	font.family: Theme.fontFamily
 	font.pixelSize: Theme.fontPixelSize
 	// TODO: this not working?!
@@ -17,13 +18,21 @@ Text {
 		enabled: root.toolTip.length > 0
 		hoverEnabled: true
 		onContainsMouseChanged: {
-			root.color = mouseArea.containsMouse ? Theme.colorPriHi : defaultColor
+			if(root.color != Theme.colorPriHi)
+				setColor = color
+			root.color = mouseArea.containsMouse ? Theme.colorPriHi : setColor
+
 			if (containsMouse) {
 				if (root.toolTip) {
 					//showToolTip(root)
 					setInfoText(root.toolTip)
 				}
 			}
+		}
+	}
+	onToolTipChanged: {
+		if(mouseArea.containsMouse && root.toolTip) {
+			setInfoText(root.toolTip)
 		}
 	}
 }

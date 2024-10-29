@@ -72,6 +72,14 @@ class PWMon (QObject):
 									for i, vol in enumerate(info["params"]["Props"][0]["channelVolumes"]):
 										node.chnvols.set_data(i, vol, "val")
 									self.log.debug("UPDATED params channelVolumes %d", id)
+								if "channelMap" in info["params"]["Props"][0]:
+									_chnMap = ""
+									for i, label in enumerate(info["params"]["Props"][0]["channelMap"]):
+											_chnMap += str(label) + ","
+									self.nodeModel.set_data(id, _chnMap, "chnmap")
+								if "mute" in info["params"]["Props"][0]:
+									self.nodeModel.set_data(id, info["params"]["Props"][0]["mute"], "mute")
+									self.log.debug("UPDATED params mute %d: %s", id, node.mute)
 							else:
 								self.log.debug("TODO update node %d %s", id, info["change-mask"])
 						else:
@@ -86,11 +94,18 @@ class PWMon (QObject):
 							if "media.type" in props:
 								_type = props["media.type"]
 							_chnVols = RealModel()
+							_chnMap = ""
+							_mute = False
 							if "Props" in info["params"]:
 								if "channelVolumes" in info["params"]["Props"][0]:
 									for real in info["params"]["Props"][0]["channelVolumes"]:
 										_chnVols.add_real(Real(real))
-							self.nodeModel.add_node(Node(name, id, _api, _type, info["state"], _chnVols, PortModel(), PortModel()))
+								if "channelMap" in info["params"]["Props"][0]:
+									for i, label in enumerate(info["params"]["Props"][0]["channelMap"]):
+											_chnMap += str(label) + ","
+								if "mute" in info["params"]["Props"][0]:
+									_mute = info["params"]["Props"][0]["mute"]
+							self.nodeModel.add_node(Node(name, id, _api, _type, info["state"], _mute, _chnVols, _chnMap, PortModel(), PortModel()))
 							self.log.debug("ADDED node %d '%s'", id, name)
 
 					# Port

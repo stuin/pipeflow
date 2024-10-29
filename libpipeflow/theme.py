@@ -31,6 +31,10 @@ class Theme(QObject):
 	def linkWidth(self):
 		return float(self.theme["linkWidth"])
 
+	@Property(float, notify=todo)
+	def maxVolume(self):
+		return float(self.theme["maxVolume"])
+
 	@Property(list, notify=todo)
 	def hideNodes(self):
 		return list(self.theme["hideNodes"].split(","))
