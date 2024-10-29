@@ -39,6 +39,18 @@ class Theme(QObject):
 	def hideNodes(self):
 		return list(self.theme["hideNodes"].split(","))
 
+	@Property(list, notify=todo)
+	def typeOrder(self):
+		return list(self.theme["typeOrder"].split(","))
+
+	@Property(int, notify=todo)
+	def sortMode(self):
+		return int(self.theme["sortMode"])
+
+	@Property(int, notify=todo)
+	def groupVertically(self):
+		return int(self.theme["groupVertically"])
+
 	@Property('QColor', notify=todo)
 	def colorLayer0(self):
 		return QColor(self.theme["colorLayer0"])

@@ -10,6 +10,8 @@ Shape {
 	property real fooY: inPort && outPort ? Math.abs(inPort.linkY - outPort.linkY) / 2 : 10
 	property real foo: Math.min(fooX, fooY)
 	property real curve: foo < 40 ? foo : 40
+	property int inNode
+	property int outNode
 	property Item outPort
 	property Item inPort
 	opacity: 0.5

@@ -15,6 +15,7 @@ Rectangle {
 	property list<string> chnMap
 	property var inPorts
 	property var outPorts
+	property int groupRoot
 	color: Theme.colorLayer1
 	width: childrenRect.width
 	height: childrenRect.height

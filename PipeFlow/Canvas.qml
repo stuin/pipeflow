@@ -12,9 +12,58 @@ Item {
 	}
 	Flow {
 		id: nodeItems
+		property int sortMode: Theme.sortMode
+		property bool groupVertically: Theme.groupVertically > 0
 		anchors.fill: parent
 		anchors.margins: 30
 		spacing: 30
+		flow: groupVertically ? Flow.LeftToRight : Flow.TopToBottom
+
+		property list<string> columnTypes: Theme.typeOrder
+
+		function chooseColumn(type) {
+			var i = 0
+			while (i < columnTypes.length && columnTypes[i] != type)
+			    i++
+			if (i == columnTypes.length)
+				columnTypes.push(type)
+
+			if (nodeItems.sortMode == 1)
+				return i
+			return 0
+		}
+
+		onPositioningComplete: {
+			for (let column of nodeItems.children) {
+				for (let node of column.children) {
+					if (node instanceof My.Node) {
+						node.x++
+						node.x--
+						node.y++
+						node.y--
+
+						if (node.parent == unassigned) {
+							node.groupRoot = 0
+							nodeItems.children[groupRoot]
+						}
+					}
+				}
+			}
+			console.log(columnTypes)
+		}
+	}
+	Item {
+		id: unassigned
+		Repeater {
+			model: nodeItems.columnTypes
+			delegate: Flow {
+				flow: nodeItems.groupVertically ? Flow.TopToBottom : Flow.LeftToRight
+				height: flow == Flow.TopToBottom ? parent.height : undefined
+				width: flow == Flow.LeftToRight ? parent.width : undefined
+				spacing: 10
+				parent: nodeItems
+			}
+		}
 		Repeater {
 			model: NodeModel
 			delegate: My.Node {
@@ -29,11 +78,14 @@ Item {
 				chnMap: chnmap.split(",")
 				inPorts: inports
 				outPorts: outports
+				groupRoot: nodeItems.chooseColumn(nodeType)
+				parent: nodeItems.children[groupRoot]
 			}
 		}
 	}
 	Item {
 		id: linkItems
+		property var nodeLinks
 		anchors.fill: parent
 		layer.enabled: true
 		layer.samples: 8
@@ -43,10 +95,77 @@ Item {
 				anchors.fill: parent
 				index: index
 				linkId: link_id
+				inNode: input_node_id
+				outNode: output_node_id
 				inPort: findNodePortById(input_node_id, input_port_id)
 				outPort: findNodePortById(output_node_id, output_port_id)
 				visible: outPort && outPort.visible && inPort && inPort.visible
 			}
+
+			onItemAdded: {
+				if(!linkItems.nodeLinks)
+					linkItems.nodeLinks = new Map()
+
+				if (item instanceof My.Link && item.outPort && item.inPort) {
+					if (!linkItems.nodeLinks.has(item.outNode))
+						linkItems.nodeLinks.set(item.outNode, [])
+					if (!linkItems.nodeLinks.get(item.outNode).includes(item.inNode))
+						linkItems.nodeLinks.get(item.outNode).push(item.inNode)
+
+					if (!linkItems.nodeLinks.has(item.inNode))
+						linkItems.nodeLinks.set(item.inNode, [])
+					if (!linkItems.nodeLinks.get(item.inNode).includes(item.outNode))
+						linkItems.nodeLinks.get(item.inNode).push(item.outNode)
+				}
+				if (nodeItems.sortMode == 2)
+					timer.start()
+			}
+		}
+
+		function groupNodes() {
+			if (nodeItems.sortMode != 2)
+				return
+
+			var nodeGroups = []
+			var visited = []
+			for (const [node, links] of linkItems.nodeLinks) {
+				if (!visited.includes(node)) {
+					var current = node
+					var currentSet = [node]
+					while(currentSet.filter(link => !visited.includes(link)).length > 0) {
+						for (let link of nodeLinks.get(current).filter(link => !visited.includes(link) && !currentSet.includes(link)))
+							currentSet.push(link)
+						visited.push(current)
+						current = currentSet.filter(link => !visited.includes(link))[0]
+					}
+					nodeGroups.push(currentSet)
+					console.log(currentSet)
+				}
+			}
+
+			var i = 0
+			for (let group of nodeGroups) {
+				//while (i < nodeItems.columnTypes.length && nodeItems.columnTypes[i] != group[0])
+				i++
+				//if (i == nodeItems.columnTypes.length)
+				//	nodeItems.columnTypes.push(group[0].toString())
+
+				for (let column of nodeItems.children) {
+					for (let node of column.children) {
+						if (node instanceof My.Node && group.includes(node.nodeId)) {
+							node.groupRoot = i
+							node.parent = nodeItems.children[node.groupRoot]
+						}
+					}
+				}
+			}
+		}
+		Timer {
+			id: timer
+			interval: 100
+			triggeredOnStart: false
+			repeat: false
+			onTriggered: linkItems.groupNodes()
 		}
 	}
 	ToolTip {
@@ -90,11 +209,13 @@ Item {
 		toolTip.visible = false
 	}
 	function findNodePortById(nodeId, portId) {
-		for (let node of nodeItems.children) {
-			if (node instanceof My.Node) {
-				if (node.nodeId === nodeId) {
-					if (node.findPortById) {
-						return node.findPortById(portId)
+		for (let column of nodeItems.children) {
+			for (let node of column.children) {
+				if (node instanceof My.Node) {
+					if (node.nodeId === nodeId) {
+						if (node.findPortById) {
+							return node.findPortById(portId)
+						}
 					}
 				}
 			}
