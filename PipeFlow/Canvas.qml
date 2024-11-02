@@ -14,6 +14,10 @@ Item {
 		id: nodeItems
 		property int sortMode: Theme.sortMode
 		property bool groupVertically: Theme.groupVertically > 0
+		property int halfScreen: 1
+		property int maxGroupSize: 5
+		property int maxNodeHeight: 5
+		property int maxNodeWidth: 5
 		anchors.fill: parent
 		anchors.margins: 30
 		spacing: 30
@@ -21,20 +25,24 @@ Item {
 
 		property list<string> columnTypes: Theme.typeOrder
 
-		function chooseColumn(type) {
+		//Choose group for node based on node type
+		function chooseColumn(type, sortMode) {
 			var i = 0
 			while (i < columnTypes.length && columnTypes[i] != type)
 			    i++
 			if (i == columnTypes.length)
 				columnTypes.push(type)
 
-			if (nodeItems.sortMode == 1)
+			if (sortMode == 1)
 				return i
 			return 0
 		}
 
 		onPositioningComplete: {
+			//Wiggle nodes to update link positions
+			var groupSizes = []
 			for (let column of nodeItems.children) {
+				var groupSum = 0
 				for (let node of column.children) {
 					if (node instanceof My.Node) {
 						node.x++
@@ -42,29 +50,48 @@ Item {
 						node.y++
 						node.y--
 
-						if (node.parent == unassigned) {
-							node.groupRoot = 0
-							nodeItems.children[groupRoot]
+						if (node.visible) {
+							if (node.width > nodeItems.maxNodeWidth)
+								nodeItems.maxNodeWidth = node.width
+							if (node.height > nodeItems.maxNodeHeight)
+								nodeItems.maxNodeHeight = node.height
+							groupSum++
+						}
+
+						//Move nodes to assigned groups
+						if (node.parent == nodeItems.children[0]) {
+							//node.groupRoot = chooseColumn(node.nodeType, nodeItems.sortMode)
+							node.parent = nodeItems.children[node.groupRoot]
 						}
 					}
 				}
+				if (groupSum > 0)
+					groupSizes.push(groupSum)
 			}
-			console.log(columnTypes)
+			console.log("Type Group Order:", columnTypes)
+			let usingLongSide = nodeItems.groupVertically == nodeItems.height > nodeItems.width
+			nodeItems.halfScreen = (groupSizes.length > 1 && usingLongSide) ? 2 : 1
+			//groupSizes.sort()
+			//nodeItems.maxGroupSize = groupSizes[Math.ceil(groupSizes.length / 2)]
+			console.log("Group Sizes:", groupSizes)
+			//console.log(nodeItems.maxGroupSize)
 		}
 	}
 	Item {
 		id: unassigned
 		Repeater {
+			//Creates set of groups
 			model: nodeItems.columnTypes
 			delegate: Flow {
 				flow: nodeItems.groupVertically ? Flow.TopToBottom : Flow.LeftToRight
-				height: flow == Flow.TopToBottom ? parent.height : undefined
-				width: flow == Flow.LeftToRight ? parent.width : undefined
+				height: flow == Flow.TopToBottom ? parent.height / nodeItems.halfScreen : undefined
+				width: flow == Flow.LeftToRight ? parent.width / nodeItems.halfScreen : undefined
 				spacing: 10
 				parent: nodeItems
 			}
 		}
 		Repeater {
+			//Creates nodes before moving them to groups
 			model: NodeModel
 			delegate: My.Node {
 				visible: !Theme.hideNodes.includes(node_label)
@@ -78,8 +105,8 @@ Item {
 				chnMap: chnmap.split(",")
 				inPorts: inports
 				outPorts: outports
-				groupRoot: nodeItems.chooseColumn(nodeType)
-				parent: nodeItems.children[groupRoot]
+				groupRoot: nodeItems.chooseColumn(nodeType, nodeItems.sortMode)
+				parent: nodeItems.children[0]
 			}
 		}
 	}
@@ -106,6 +133,7 @@ Item {
 				if(!linkItems.nodeLinks)
 					linkItems.nodeLinks = new Map()
 
+				//Create undirected graph of connected nodes
 				if (item instanceof My.Link && item.outPort && item.inPort) {
 					if (!linkItems.nodeLinks.has(item.outNode))
 						linkItems.nodeLinks.set(item.outNode, [])
@@ -120,13 +148,22 @@ Item {
 				if (nodeItems.sortMode == 2)
 					timer.start()
 			}
+
+			onItemRemoved: {
+				if (nodeItems.sortMode == 2)
+					timer.start()
+			}
 		}
 
+		//Sort nodes into groups by connections
 		function groupNodes() {
 			if (nodeItems.sortMode != 2)
 				return
 
-			var nodeGroups = []
+			//Recursively check links by id to find groupings
+			console.log("Finding connected node groups:")
+			var nodeGroupIds = []
+			var nodeGroupObjects = []
 			var visited = []
 			for (const [node, links] of linkItems.nodeLinks) {
 				if (!visited.includes(node)) {
@@ -138,24 +175,52 @@ Item {
 						visited.push(current)
 						current = currentSet.filter(link => !visited.includes(link))[0]
 					}
-					nodeGroups.push(currentSet)
+					nodeGroupIds.push(currentSet)
+					var tempList = []
+					for (let type of nodeItems.columnTypes)
+						tempList.push([])
+					nodeGroupObjects.push(tempList)
 					console.log(currentSet)
 				}
 			}
 
+			//Convert from node ids to nodes and sort by type
+			for (let column of nodeItems.children) {
+				for (let node of column.children) {
+					if (node instanceof My.Node) {
+						var found = false
+						for (var j = 0; j < nodeGroupIds.length; j++) {
+							if (nodeGroupIds[j].includes(node.nodeId)) {
+								nodeGroupObjects[j][nodeItems.chooseColumn(node.nodeType, 1)].push(node)
+								found = true
+							}
+						}
+						if (!found) {
+							node.groupRoot = 0
+							node.parent = nodeItems.children[0]
+						}
+					}
+				}
+			}
+
+			//Move nodes to new groups in order
 			var i = 0
-			for (let group of nodeGroups) {
+			for (var g = 0; g < nodeGroupObjects.length; g++) {
 				//while (i < nodeItems.columnTypes.length && nodeItems.columnTypes[i] != group[0])
 				i++
+				var count = 0
 				//if (i == nodeItems.columnTypes.length)
 				//	nodeItems.columnTypes.push(group[0].toString())
 
-				for (let column of nodeItems.children) {
-					for (let node of column.children) {
-						if (node instanceof My.Node && group.includes(node.nodeId)) {
-							node.groupRoot = i
-							node.parent = nodeItems.children[node.groupRoot]
-						}
+				for (var t = 0; t < nodeGroupObjects[g].length; t++) {
+					if (t > 2 && count > 2 && count <= nodeGroupIds[g].length / 2) {
+						//Large groups can be split between inputs and outputs
+						i++
+					}
+					for (let node of nodeGroupObjects[g][t]) {
+						node.groupRoot = i
+						node.parent = nodeItems.children[node.groupRoot]
+						count++
 					}
 				}
 			}
