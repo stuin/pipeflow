@@ -33,7 +33,7 @@ Rectangle {
 	}
 	My.Text {
 		property bool muteVolume: root.muteVolume
-		property string a: muteVolume ? "M" : "U"
+		property string a: muteVolume ? "M" : "M"
 		text: a
 		toolTip: [
 			"(" + root.nodeId + (muteVolume ? ") Muted" : ") Unmuted"),

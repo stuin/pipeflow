@@ -25,57 +25,7 @@ Item {
 
 		property list<string> columnTypes: Theme.typeOrder
 
-		//Choose group for node based on node type
-		function chooseColumn(type, sortMode) {
-			var i = 0
-			while (i < columnTypes.length && columnTypes[i] != type)
-			    i++
-			if (i == columnTypes.length)
-				columnTypes.push(type)
-
-			if (sortMode == 1)
-				return i
-			return 0
-		}
-
-		onPositioningComplete: {
-			//Wiggle nodes to update link positions
-			var groupSizes = []
-			for (let column of nodeItems.children) {
-				var groupSum = 0
-				for (let node of column.children) {
-					if (node instanceof My.Node) {
-						node.x++
-						node.x--
-						node.y++
-						node.y--
-
-						if (node.visible) {
-							if (node.width > nodeItems.maxNodeWidth)
-								nodeItems.maxNodeWidth = node.width
-							if (node.height > nodeItems.maxNodeHeight)
-								nodeItems.maxNodeHeight = node.height
-							groupSum++
-						}
-
-						//Move nodes to assigned groups
-						if (node.parent == nodeItems.children[0]) {
-							//node.groupRoot = chooseColumn(node.nodeType, nodeItems.sortMode)
-							node.parent = nodeItems.children[node.groupRoot]
-						}
-					}
-				}
-				if (groupSum > 0)
-					groupSizes.push(groupSum)
-			}
-			console.log("Type Group Order:", columnTypes)
-			let usingLongSide = nodeItems.groupVertically == nodeItems.height > nodeItems.width
-			nodeItems.halfScreen = (groupSizes.length > 1 && usingLongSide) ? 2 : 1
-			//groupSizes.sort()
-			//nodeItems.maxGroupSize = groupSizes[Math.ceil(groupSizes.length / 2)]
-			console.log("Group Sizes:", groupSizes)
-			//console.log(nodeItems.maxGroupSize)
-		}
+		onPositioningComplete: checkNodePositions()
 	}
 	Item {
 		id: unassigned
@@ -105,7 +55,7 @@ Item {
 				chnMap: chnmap.split(",")
 				inPorts: inports
 				outPorts: outports
-				groupRoot: nodeItems.chooseColumn(nodeType, nodeItems.sortMode)
+				groupRoot: chooseNodeColumn(this, nodeItems.sortMode)
 				parent: nodeItems.children[0]
 			}
 		}
@@ -129,108 +79,17 @@ Item {
 				visible: outPort && outPort.visible && inPort && inPort.visible
 			}
 
-			onItemAdded: {
-				if(!linkItems.nodeLinks)
-					linkItems.nodeLinks = new Map()
+			onItemAdded: linkAdded(item)
 
-				//Create undirected graph of connected nodes
-				if (item instanceof My.Link && item.outPort && item.inPort) {
-					if (!linkItems.nodeLinks.has(item.outNode))
-						linkItems.nodeLinks.set(item.outNode, [])
-					if (!linkItems.nodeLinks.get(item.outNode).includes(item.inNode))
-						linkItems.nodeLinks.get(item.outNode).push(item.inNode)
-
-					if (!linkItems.nodeLinks.has(item.inNode))
-						linkItems.nodeLinks.set(item.inNode, [])
-					if (!linkItems.nodeLinks.get(item.inNode).includes(item.outNode))
-						linkItems.nodeLinks.get(item.inNode).push(item.outNode)
-				}
-				if (nodeItems.sortMode == 2)
-					timer.start()
-			}
-
-			onItemRemoved: {
-				if (nodeItems.sortMode == 2)
-					timer.start()
-			}
+			onItemRemoved: linkRemoved(item)
 		}
 
-		//Sort nodes into groups by connections
-		function groupNodes() {
-			if (nodeItems.sortMode != 2)
-				return
-
-			//Recursively check links by id to find groupings
-			console.log("Finding connected node groups:")
-			var nodeGroupIds = []
-			var nodeGroupObjects = []
-			var visited = []
-			for (const [node, links] of linkItems.nodeLinks) {
-				if (!visited.includes(node)) {
-					var current = node
-					var currentSet = [node]
-					while(currentSet.filter(link => !visited.includes(link)).length > 0) {
-						for (let link of nodeLinks.get(current).filter(link => !visited.includes(link) && !currentSet.includes(link)))
-							currentSet.push(link)
-						visited.push(current)
-						current = currentSet.filter(link => !visited.includes(link))[0]
-					}
-					nodeGroupIds.push(currentSet)
-					var tempList = []
-					for (let type of nodeItems.columnTypes)
-						tempList.push([])
-					nodeGroupObjects.push(tempList)
-					console.log(currentSet)
-				}
-			}
-
-			//Convert from node ids to nodes and sort by type
-			for (let column of nodeItems.children) {
-				for (let node of column.children) {
-					if (node instanceof My.Node) {
-						var found = false
-						for (var j = 0; j < nodeGroupIds.length; j++) {
-							if (nodeGroupIds[j].includes(node.nodeId)) {
-								nodeGroupObjects[j][nodeItems.chooseColumn(node.nodeType, 1)].push(node)
-								found = true
-							}
-						}
-						if (!found) {
-							node.groupRoot = 0
-							node.parent = nodeItems.children[0]
-						}
-					}
-				}
-			}
-
-			//Move nodes to new groups in order
-			var i = 0
-			for (var g = 0; g < nodeGroupObjects.length; g++) {
-				//while (i < nodeItems.columnTypes.length && nodeItems.columnTypes[i] != group[0])
-				i++
-				var count = 0
-				//if (i == nodeItems.columnTypes.length)
-				//	nodeItems.columnTypes.push(group[0].toString())
-
-				for (var t = 0; t < nodeGroupObjects[g].length; t++) {
-					if (t > 2 && count > 2 && count <= nodeGroupIds[g].length / 2) {
-						//Large groups can be split between inputs and outputs
-						i++
-					}
-					for (let node of nodeGroupObjects[g][t]) {
-						node.groupRoot = i
-						node.parent = nodeItems.children[node.groupRoot]
-						count++
-					}
-				}
-			}
-		}
 		Timer {
-			id: timer
+			id: linkTimer
 			interval: 100
 			triggeredOnStart: false
 			repeat: false
-			onTriggered: linkItems.groupNodes()
+			onTriggered: groupNodeConnections()
 		}
 	}
 	ToolTip {
@@ -243,6 +102,7 @@ Item {
 		Bottom,
 		Left
 	}
+	// --- Tooltip functions ---
 	function findSideWithMostSpace (x, y, w, h) {
 		let l = x
 		let ret = My.Canvas.ItemSide.Top
@@ -272,6 +132,157 @@ Item {
 	}
 	function hideToolTip(){
 		toolTip.visible = false
+	}
+	// --- Node sorting functions ---
+	//Make sure nodes are in the correct group
+	//Runs when nodes finish moving
+	function checkNodePositions() {
+		//Wiggle nodes to update link positions
+		var groupSizes = []
+		for (let column of nodeItems.children) {
+			var groupSum = 0
+			for (let node of column.children) {
+				if (node instanceof My.Node) {
+					node.x++
+					node.x--
+					node.y++
+					node.y--
+
+					if (node.visible) {
+						if (node.width > nodeItems.maxNodeWidth)
+							nodeItems.maxNodeWidth = node.width
+						if (node.height > nodeItems.maxNodeHeight)
+							nodeItems.maxNodeHeight = node.height
+						groupSum++
+					}
+
+					//Move nodes to assigned groups
+					if (node.parent == nodeItems.children[0]) {
+						//node.groupRoot = chooseColumn(node.nodeType, nodeItems.sortMode)
+						node.parent = nodeItems.children[node.groupRoot]
+					}
+				}
+			}
+			if (groupSum > 0)
+				groupSizes.push(groupSum)
+		}
+		console.log("Type Group Order:", nodeItems.columnTypes)
+		console.log("Group Sizes:", groupSizes)
+		let usingLongSide = nodeItems.groupVertically == nodeItems.height > nodeItems.width
+		nodeItems.halfScreen = (groupSizes.length > 1 && usingLongSide) ? 2 : 1
+		//groupSizes.sort()
+		//nodeItems.maxGroupSize = groupSizes[Math.ceil(groupSizes.length / 2)]
+		//console.log(nodeItems.maxGroupSize)
+	}
+	//Find node groups based on node type/api
+	function chooseNodeColumn(node, sortMode) {
+		var type = node.nodeType
+		if (sortMode == 2)
+			type = node.nodeApi
+
+		var i = 0
+		while (i < nodeItems.columnTypes.length && nodeItems.columnTypes[i] != type)
+		    i++
+		if (i == nodeItems.columnTypes.length)
+			nodeItems.columnTypes.push(type)
+
+		if (sortMode == 1 || sortMode == 2)
+			return i
+		return 0
+	}
+	//Sort nodes into groups by connections
+	function groupNodeConnections() {
+		if (nodeItems.sortMode != 3)
+			return
+
+		//Recursively check links by id to find groupings
+		console.log("Finding connected node groups:")
+		var nodeGroupIds = []
+		var nodeGroupObjects = []
+		var visited = []
+		for (const [node, links] of linkItems.nodeLinks) {
+			if (!visited.includes(node)) {
+				var current = node
+				var currentSet = [node]
+				while(currentSet.filter(link => !visited.includes(link)).length > 0) {
+					for (let link of linkItems.nodeLinks.get(current).filter(link => !visited.includes(link) && !currentSet.includes(link)))
+						currentSet.push(link)
+					visited.push(current)
+					current = currentSet.filter(link => !visited.includes(link))[0]
+				}
+				nodeGroupIds.push(currentSet)
+				var tempList = []
+				for (let type of nodeItems.columnTypes)
+					tempList.push([])
+				nodeGroupObjects.push(tempList)
+				console.log(currentSet)
+			}
+		}
+
+		//Convert from node ids to nodes and sort by type
+		for (let column of nodeItems.children) {
+			for (let node of column.children) {
+				if (node instanceof My.Node) {
+					var found = false
+					for (var j = 0; j < nodeGroupIds.length && !found; j++) {
+						if (nodeGroupIds[j].includes(node.nodeId)) {
+							nodeGroupObjects[j][chooseNodeColumn(node, 1)].push(node)
+							found = true
+						}
+					}
+					if (!found) {
+						node.groupRoot = 0
+						node.parent = nodeItems.children[0]
+					}
+				}
+			}
+		}
+
+		//Move nodes to new groups in order
+		var i = 0
+		for (var g = 0; g < nodeGroupObjects.length; g++) {
+			//while (i < nodeItems.columnTypes.length && nodeItems.columnTypes[i] != group[0])
+			i++
+			var count = 0
+			//if (i == nodeItems.columnTypes.length)
+			//	nodeItems.columnTypes.push(group[0].toString())
+
+			for (var t = 0; t < nodeGroupObjects[g].length; t++) {
+				if (t > 2 && count > 2 && count <= nodeGroupIds[g].length / 2) {
+					//Large groups can be split between inputs and outputs
+					i++
+				}
+				for (let node of nodeGroupObjects[g][t]) {
+					node.groupRoot = i
+					node.parent = nodeItems.children[node.groupRoot]
+					count++
+				}
+			}
+		}
+	}
+	// --- Link Functions ---
+	function linkAdded(item) {
+		if(!linkItems.nodeLinks)
+			linkItems.nodeLinks = new Map()
+
+		//Create undirected graph of connected nodes
+		if (item instanceof My.Link && item.outPort && item.inPort) {
+			if (!linkItems.nodeLinks.has(item.outNode))
+				linkItems.nodeLinks.set(item.outNode, [])
+			if (!linkItems.nodeLinks.get(item.outNode).includes(item.inNode))
+				linkItems.nodeLinks.get(item.outNode).push(item.inNode)
+
+			if (!linkItems.nodeLinks.has(item.inNode))
+				linkItems.nodeLinks.set(item.inNode, [])
+			if (!linkItems.nodeLinks.get(item.inNode).includes(item.outNode))
+				linkItems.nodeLinks.get(item.inNode).push(item.outNode)
+		}
+		if (nodeItems.sortMode == 3)
+			linkTimer.start()
+	}
+	function linkRemoved(item) {
+		if (nodeItems.sortMode == 3)
+			linkTimer.start()
 	}
 	function findNodePortById(nodeId, portId) {
 		for (let column of nodeItems.children) {
