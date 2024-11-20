@@ -19,14 +19,14 @@ Rectangle {
 	Rectangle {
 		id: thumb
 		property color baseColor: Theme.colorLayer2
-		x: Math.round(maxw * value / Theme.maxVolume)
+		x: Math.round(maxw * value**(1/3) / Theme.maxVolume)
 		height: root.height
 		width: Theme.fontPixelSize
 		color: mouseArea.containsMouse ? Theme.colorPriLow : baseColor
 	}
 	My.Text {
 		id: valText
-		text: Math.round(root.value * 100) + "%"
+		text: Math.round(root.value**(1/3) * 100) + "%"
 		width: root.width
 		horizontalAlignment: Text.AlignHCenter
 		color: Theme.colorLayer1
@@ -98,7 +98,7 @@ Rectangle {
 			interval: 100 // we dont want to call pw-cli faster than this
 			triggeredOnStart: true
 			repeat: true
-			onTriggered: root.requestValue = clamp(mouseArea.mouseX / root.width * Theme.maxVolume, 0, Theme.maxVolume)
+			onTriggered: root.requestValue = clamp((mouseArea.mouseX / root.width)**3 * Theme.maxVolume, 0, Theme.maxVolume)
 		}
 	}
 	Component.onCompleted: {

@@ -13,6 +13,7 @@ Item {
 	Flow {
 		id: nodeItems
 		property int sortMode: Theme.sortMode
+		property double dimensions: width * height
 		property bool groupVertically: Theme.groupVertically > 0
 		property int halfScreen: 1
 		property int maxGroupSize: 5
@@ -26,6 +27,7 @@ Item {
 		property list<string> columnTypes: Theme.typeOrder
 
 		onPositioningComplete: checkNodePositions()
+		onDimensionsChanged: checkNodePositions()
 	}
 	Item {
 		id: unassigned
