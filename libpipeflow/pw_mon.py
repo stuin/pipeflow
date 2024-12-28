@@ -8,15 +8,17 @@ from .node import Node, NodeModel
 from .port import Port, PortModel
 from .link import Link, LinkModel
 from .real import Real, RealModel
+from .meta import Meta, MetaModel
 
 class PWMon (QObject):
-	def __init__(self, nodeModel:NodeModel, linkModel:LinkModel, parent=None):
+	def __init__(self, nodeModel:NodeModel, linkModel:LinkModel, metaModel:MetaModel, parent=None):
 		self.log = logging.getLogger("main")
 		self.p = QProcess()
 		self.p.readyReadStandardOutput.connect(self.handleStdout)
 		self.p.start("pw-dump", ["--no-colors", "--monitor"])
 		self.nodeModel = nodeModel
 		self.linkModel = linkModel
+		self.metaModel = metaModel
 		self.action = None
 		self.moarjson = ""
 	def handleStdout (self):
@@ -34,7 +36,21 @@ class PWMon (QObject):
 				data = json.loads(entry)
 				for item in data:
 					if not "info" in item:
-						# TODO: do we want these?
+						# Metadata
+						if item["type"] == "PipeWire:Interface:Metadata":
+								if "props" in item and "metadata.name" in item["props"]:
+										if item["props"]["metadata.name"] == "default" and "metadata" in item:
+												self.log.debug(item["metadata"])
+												default_sink = ""
+												default_source = ""
+												for entry in item["metadata"]:
+													if entry["key"] == "default.audio.sink":
+														default_sink = entry["value"]["name"]
+													elif entry["key"] == "default.audio.source":
+														default_source = entry["value"]["name"]
+												self.log.debug(default_sink)
+												self.log.debug(default_source)
+												self.metaModel.add_meta(Meta(default_sink, default_source))
 						continue
 
 					id = item["id"]
@@ -60,8 +76,9 @@ class PWMon (QObject):
 					# Node
 					if item["type"] == "PipeWire:Interface:Node":
 						name = props["node.name"]
+						nick = name
 						if "node.nick" in props:
-							name = props["node.nick"]
+							nick = props["node.nick"]
 						row, node = self.nodeModel.get_node_by_id(id)
 						if node:
 							if "state" in info["change-mask"]:
@@ -105,7 +122,7 @@ class PWMon (QObject):
 											_chnMap += str(label) + ","
 								if "mute" in info["params"]["Props"][0]:
 									_mute = info["params"]["Props"][0]["mute"]
-							self.nodeModel.add_node(Node(name, id, _api, _type, info["state"], _mute, _chnVols, _chnMap, PortModel(), PortModel()))
+							self.nodeModel.add_node(Node(nick, name, id, _api, _type, info["state"], _mute, _chnVols, _chnMap, PortModel(), PortModel()))
 							self.log.debug("ADDED node %d '%s'", id, name)
 
 					# Port

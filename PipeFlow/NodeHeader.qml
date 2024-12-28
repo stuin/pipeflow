@@ -9,6 +9,7 @@ Item {
 	property string nodeState
 	property string nodeType
 	property string nodeApi
+	property bool isDefault
 	property var chnVols: [0.25, 0.5]
 	implicitWidth: layout.width
 	implicitHeight: layout.height
@@ -23,7 +24,7 @@ Item {
 					"("+root.nodeId+") Node Label : " + root.label,
 					"- Left press and drag to move Node"
 				].join("\n")
-				defaultColor: Theme.colorLayer3
+				defaultColor: isDefault ? Theme.colorGreenLow : Theme.colorLayer3
 			}
 			TheText {
 				property string a: root.nodeApi ? root.nodeApi[0].toUpperCase() : "?"

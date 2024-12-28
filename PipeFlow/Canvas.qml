@@ -30,7 +30,18 @@ Item {
 		onDimensionsChanged: checkNodePositions()
 	}
 	Item {
+		id: metaData
+	}
+	Item {
 		id: unassigned
+		Repeater {
+			model: MetaModel
+			delegate: Item {
+				property string defaultSink: default_sink
+				property string defaultSource: default_source
+				parent: metaData
+			}
+		}
 		Repeater {
 			//Creates set of groups
 			model: nodeItems.columnTypes
@@ -48,11 +59,13 @@ Item {
 			delegate: My.Node {
 				visible: !Theme.hideNodes.includes(node_label)
 				label: node_label
+				nodeName: node_name
 				nodeId: node_id
 				nodeState: node_state
 				nodeType: node_type
 				nodeApi: node_api
 				muteVolume: mute
+				isDefault: false
 				chnVols: chnvols
 				chnMap: chnmap.split(",")
 				inPorts: inports
@@ -158,6 +171,12 @@ Item {
 						groupSum++
 					}
 
+					//Check if default sink/source
+					if (metaData.children.length > 0) {
+						node.isDefault = (node.nodeName == metaData.children[0].defaultSink) ||
+							(node.nodeName == metaData.children[0].defaultSource)
+					}
+
 					//Move nodes to assigned groups
 					if (node.parent == nodeItems.children[0]) {
 						//node.groupRoot = chooseColumn(node.nodeType, nodeItems.sortMode)
@@ -175,6 +194,9 @@ Item {
 		//groupSizes.sort()
 		//nodeItems.maxGroupSize = groupSizes[Math.ceil(groupSizes.length / 2)]
 		//console.log(nodeItems.maxGroupSize)
+
+		//console.log(metaData.children[0].defaultSink)
+		//console.log(metaData.children[0].defaultSource)
 	}
 	//Find node groups based on node type/api
 	function chooseNodeColumn(node, sortMode) {

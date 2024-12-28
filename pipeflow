@@ -25,6 +25,7 @@ from libpipeflow.pw_link import PWLink
 from libpipeflow.pw_mon import PWMon
 from libpipeflow.node import NodeModel
 from libpipeflow.link import LinkModel
+from libpipeflow.meta import MetaModel
 from libpipeflow.theme import Theme
 
 # xdg dirs
@@ -53,13 +54,15 @@ app = QApplication()
 engine = QQmlApplicationEngine()
 nodes = NodeModel()
 links = LinkModel()
+meta = MetaModel()
 
 pw_cli = PWCli()
 pw_link = PWLink()
-pw_mon = PWMon(nodes, links)
+pw_mon = PWMon(nodes, links, meta)
 theme = Theme(theme_file)
 engine.rootContext().setContextProperty("NodeModel", nodes)
 engine.rootContext().setContextProperty("LinkModel", links)
+engine.rootContext().setContextProperty("MetaModel", meta)
 engine.rootContext().setContextProperty("PwLink", pw_link)
 engine.rootContext().setContextProperty("PwCli", pw_cli)
 engine.rootContext().setContextProperty("Theme", theme)

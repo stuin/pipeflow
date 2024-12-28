@@ -9,6 +9,7 @@ from .real import Real, RealModel
 @dataclass
 class Node:
 	node_label: str
+	node_name: str
 	node_id: int
 	node_api: str
 	node_type: str

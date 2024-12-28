@@ -5,12 +5,14 @@ import PipeFlow as My
 Rectangle {
 	id: root
 	property string label
+	property string nodeName
 	property int nodeId
 	property string nodeState
 	property string nodeType
 	property string nodeApi
 	property bool muteVolume
 	property bool lockVolume: false
+	property bool isDefault
 	property var chnVols: []
 	property list<string> chnMap
 	property var inPorts
@@ -39,6 +41,7 @@ Rectangle {
 			nodeState: root.nodeState
 			nodeType: root.nodeType
 			nodeApi: root.nodeApi
+			isDefault: root.isDefault
 			chnVols: root.chnVols
 			MouseArea {
 				width: parent.width
